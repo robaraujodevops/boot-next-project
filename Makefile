@@ -8,6 +8,7 @@ workdir=$(app_name)
 buildarg=--build-arg WORKDIR=$(workdir)
 
 run_app=docker run -d --rm \
+	--network host \
 	--user $(shell id -u) \
 	-v `pwd`/next-app:/$(workdir) \
 	--name $(app_name) $(dev_image) \
