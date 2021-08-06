@@ -1,17 +1,20 @@
 include help.mk
 
-app_name=next-app
+workdir=/app
+
 dev_image=next-dev-image:latest
 prod_image=next-prod-image:latest
-workdir=$(app_name)
+img_exists=$(shell docker images $(dev_image) | grep next-dev || echo false)
 
-buildarg=--build-arg WORKDIR=$(workdir)
-
-run_app=docker run -d --rm \
+run=docker run \
 	--network host \
-	--user $(shell id -u) \
-	-v `pwd`/next-app:/$(workdir) \
-	--name $(app_name) $(dev_image) \
+	--rm \
+	--user $(shell id -u)
+
+run_app=$(run) \
+	-v `pwd`:$(workdir) \
+	--name next-app-dev \
+	--tty --interactive 
 
 .PHONY: init-project
 init-project: ##@ Builds development image
@@ -20,23 +23,20 @@ init-project: ##@ Builds development image
 	else \
 		echo "Next App not exists, creating..."; \
 		$(run) -v `pwd`:$(workdir) node:alpine \
-			yarn create next-app --typescript $(workdir)/$(app_name); \
+			yarn create next-app --typescript $(workdir)/next-app; \
 	fi
 
 .PHONY: build-dev-image
 build-dev-image: ##@dev Build dev image
-	docker build -t $(dev_image) $(buildarg) -f build/dev/Dockerfile .
+ifeq ($(img_exists), false)
+		docker build -t $(dev_image) $(buildarg) -f build/dev/Dockerfile .
+endif
 
 .PHONY: run-dev
 run-dev: build-dev-image ##@dev Run development stack
-	$(run_app) \
-		yarn run dev; \
-		docker logs $(app_name) -f
-
-.PHONY: stop-dev
-stop-dev: ##@dev Stop dev process
-	docker rm -f $(app_name)
+	$(run_app) $(dev_image) \
+		yarn run dev
 
 .PHONY: build-app
 build-app: ##@build Build app
-	docker build -t $(prod_image) -f build/prod/Dockerfile $(app_name)
+	docker build -t $(prod_image) -f build/prod/Dockerfile next-app 
